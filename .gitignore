@@ -1,0 +1,12 @@
+# OSが勝手に作るゴミファイル（Mac/Windows）
+.DS_Store
+Thumbs.db
+
+# メモや引き継ぎ資料
+secret_notes.txt
+/docs/internal/
+
+# サーバーの設定ファイルやパスワード（超重要！）
+.env
+config.php
+connect_db.php
