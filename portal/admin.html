@@ -78,7 +78,6 @@
                 window.location.replace('notice-permanent.html');
                 return;
             }
-            // ★スーパーユーザーなら隠しボタン等を表示
             if (currentUserRole === "superuser") {
                 document.getElementById('op-log-toggle-btn').style.display = "inline-block";
                 document.getElementById('log-delete-th').style.display = "table-cell";
@@ -108,12 +107,16 @@
         window.closeRoleModal = function() { document.getElementById('role-modal').style.display='none'; document.getElementById('modal-is-temp').checked=false; toggleDateInput(); document.getElementById('modal-expire-date').value=''; }
         window.toggleDateInput = function() { document.getElementById('modal-expire-date').style.display = document.getElementById('modal-is-temp').checked ? 'block' : 'none'; }
 
-        // ★コードの秘匿化：日本語を削除し、システムエラーコードに見せかける
+        // ★防衛ログのフォーマット修正：無機質かつ明確に
         window.saveRole = function() { const tUid = document.getElementById('modal-user-id').value, tEmail = document.getElementById('modal-user-email-hidden').value, nRole = document.getElementById('modal-role-select').value, isTemp = document.getElementById('modal-is-temp').checked, expDate = document.getElementById('modal-expire-date').value; 
             db.collection("users").doc(tUid).get().then((doc) => { 
                 if (doc.data().role === "superuser") { 
                     if (currentUserRole !== "superuser") { 
-                        addOperationLog(`SYS_ERR_AUTH_MOD: [${currentUserEmail}] -> [${tEmail}]`, true, true); 
+                        let rJp = (nRole === "admin") ? "管理者" : (nRole === "content_admin") ? "コンテンツ管理者" : "一般局員";
+                        let att = `「${rJp}」`;
+                        if (isTemp && expDate) att += `(until:${expDate})`;
+                        // 例: 23610109ks@stu.yamato-u.ac.jp ➡ kurato.sugita@gmail.com(S) 「管理者」 try to change
+                        addOperationLog(`${currentUserEmail} ➡ ${tEmail}(S) ${att} try to change`, true, true); 
                     } 
                     alert("ERR_0x001"); 
                     closeRoleModal(); 
@@ -123,11 +126,13 @@
                 db.collection("users").doc(tUid).update(upData).then(() => { addOperationLog(actTxt); alert("更新しました"); closeRoleModal(); }); 
             }); 
         }
+        
         window.deleteUserFromModal = function() { const tUid = document.getElementById('modal-user-id').value; const tEmail = document.getElementById('modal-user-email-hidden').value; 
             db.collection("users").doc(tUid).get().then((doc) => { 
                 if (doc.exists && doc.data().role === "superuser") { 
                     if (currentUserRole !== "superuser") {
-                        addOperationLog(`SYS_ERR_AUTH_DEL: [${currentUserEmail}] -> [${tEmail}]`, true, true); 
+                        // 例: 23610109ks@stu.yamato-u.ac.jp ➡ kurato.sugita@gmail.com(S) try to delete
+                        addOperationLog(`${currentUserEmail} ➡ ${tEmail}(S) try to delete`, true, true); 
                     }
                     alert("ERR_0x001"); 
                     closeRoleModal(); 
@@ -137,7 +142,6 @@
             }); 
         };
 
-        // 操作ログの一覧。セキュリティログは通常のテーブルの中に隠れる（非表示行になる）
         function loadOperationLogs() { 
             db.collection("operation_logs").orderBy("timestamp", "desc").onSnapshot((qs) => { 
                 const tb = document.getElementById('operation-list-body'); 
