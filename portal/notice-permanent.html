@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>常設お知らせ | 和纏祭ポータル</title>
+    <link rel="stylesheet" href="css/dashboard.css">
+</head>
+<body>
+    <div id="auth-guard" style="position: fixed; top:0; left:0; width:100%; height:100%; background:white; z-index:9999; display: flex; justify-content: center; align-items: center;"><h2>認証情報を確認中...</h2></div>
+    <div id="pending-screen"><h1>⏳ 承認待ちです</h1><p>管理者による確認待ち状態です。</p><button class="logout-btn" style="width: 200px; border-radius: 5px;" onclick="firebase.auth().signOut()">ログアウトして戻る</button></div>
+    <div id="rejected-screen"><h1 style="color: #e74c3c;">🚫 アクセスが拒否されました</h1><p>このアカウントからの参加申請は拒否されました。</p><button class="logout-btn" style="width: 200px; border-radius: 5px;" onclick="firebase.auth().signOut()">ログアウト</button></div>
+    <div id="overlay" onclick="closeSidebarMobile()"></div>
+
+    <div id="sidebar">
+        <h2>局員ポータル</h2>
+        <button class="menu-btn" onclick="window.location.href='admin.html'" id="menu-admin" style="display:none;">👑 権限管理・ログ <span id="pending-badge" class="badge">0</span></button>
+        <button class="menu-btn active" onclick="window.location.href='notice-permanent.html'">📌 常設サイトお知らせ</button>
+        <button class="menu-btn" onclick="window.location.href='notice-yearly.html'">📅 年度別お知らせ</button>
+        <button class="menu-btn" onclick="window.location.href='sponsors.html'">🤝 協賛企業管理</button>
+        <div class="spacer"></div>
+        <div style="padding: 10px; font-size: 12px; color: #bdc3c7;" id="user-email"></div>
+        <div style="padding: 0 10px 10px 10px; font-size: 12px; color: #f1c40f;" id="user-role-display"></div>
+        <button class="logout-btn" onclick="firebase.auth().signOut()">ログアウト</button>
+    </div>
+
+    <div id="content-wrapper">
+        <div id="top-header">
+            <button class="hamburger-btn" onclick="toggleSidebar()">☰</button>
+            <h2 id="header-title" style="margin:0; font-size: 18px; color: #2c3e50;">📌 常設サイト お知らせ管理</h2>
+        </div>
+
+        <div id="main-content" style="display:block;">
+            <div class="form-box">
+                <h3 id="perm-form-title">✨ 新規作成</h3>
+                <input type="hidden" id="perm-edit-id">
+                <input type="hidden" id="perm-old-images">
+                <input type="hidden" id="perm-old-pdfs">
+                
+                <div class="flex-row" style="background-color: #fef9e7; padding: 10px; border-radius: 5px; border: 1px solid #f1c40f;">
+                    <label style="font-weight: bold; cursor: pointer; font-size: 16px;">
+                        <input type="checkbox" id="perm-important" style="transform: scale(1.5); margin-right: 10px;"> 🚨 このお知らせに「重要バッジ」を付ける
+                    </label>
+                </div>
+
+                <label style="font-weight: bold;">タイトル</label>
+                <input type="text" id="perm-title" placeholder="例：和纏祭公式サイトをリニューアルしました">
+                
+                <label style="font-weight: bold;">内容</label>
+                <textarea id="perm-body" rows="5" placeholder="お知らせの内容を入力..."></textarea>
+                
+                <div class="flex-row"><div><label style="font-weight: bold;">🎨 本文の文字色</label><br><input type="color" id="perm-color" value="#000000" style="width: 100px; height: 40px; padding: 0; cursor: pointer;"></div></div>
+
+                <div class="flex-row" style="background-color: #ebf5fb; padding: 15px; border-radius: 5px; margin-bottom: 20px; border: 1px solid #3498db; flex-direction: column; align-items: stretch;">
+                    <div style="margin-bottom: 15px;">
+                        <label style="font-weight: bold;">🖼️ 写真を追加（最大10枚）</label>
+                        <p style="margin: 0 0 10px 0; font-size:12px; color:gray;" id="perm-old-images-msg"></p>
+                        <div id="image-inputs-container"></div>
+                        <button type="button" class="toggle-btn" style="background-color: #3498db; width: 100%;" onclick="addImageInput()">＋ 新しい写真を追加する</button>
+                    </div>
+                    <div style="border-top: 1px dashed #bdc3c7; padding-top: 15px;">
+                        <label style="font-weight: bold;">📄 PDFを追加（最大4つ）</label>
+                        <p style="margin: 0 0 10px 0; font-size:12px; color:gray;" id="perm-old-pdfs-msg"></p>
+                        <div id="pdf-inputs-container"></div>
+                        <button type="button" class="toggle-btn" style="background-color: #3498db; width: 100%;" onclick="addPdfInput()">＋ 新しいPDFを追加する</button>
+                    </div>
+                </div>
+
+                <div class="flex-row" style="background-color: #e8f8f5; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
+                    <div><label style="font-weight: bold;">⏳ 公開開始日時（予約投稿）</label><input type="datetime-local" id="perm-start"><p style="margin:0; font-size:12px; color:gray;">指定しない場合は即時公開</p></div>
+                    <div><label style="font-weight: bold;">🗑️ 公開終了日時（自動削除）</label><input type="datetime-local" id="perm-end"><p style="margin:0; font-size:12px; color:gray;">指定しない場合は永久公開</p></div>
+                </div>
+                
+                <button class="submit-btn" id="btn-perm-submit">保存する</button>
+                <button class="edit-btn" id="btn-perm-cancel" style="display:none; background:#95a5a6; margin-left: 10px;" onclick="cancelEditNotice()">キャンセル</button>
+                <p id="perm-msg" style="color: green; font-weight: bold; margin-top: 10px;"></p>
+            </div>
+
+            <div class="form-box">
+                <h3>📝 投稿済みのお知らせ一覧</h3>
+                <div class="table-wrapper"><table><thead><tr><th>ステータス</th><th>タイトル</th><th>添付</th><th>操作</th></tr></thead><tbody id="perm-notices-list"></tbody></table></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
+    <script src="js/common.js"></script> <script>
+        // ★★★ 準備: ここにGASのURLを貼り付けます ★★★
+        const GAS_WEB_APP_URL = "ここにGASのURLを貼り付ける";
+
+        // common.jsから呼ばれる初期化関数
+        function initPage() {
+            resetFileInputs();
+            loadPermanentNotices();
+        }
+
+        // --- UI関数 ---
+        window.addImageInput = function() { const c = document.getElementById('image-inputs-container'); if (c.children.length >= 10) { alert("写真は最大10枚です"); return; } const r = document.createElement('div'); r.style.cssText = 'display:flex; gap:10px; margin-bottom:10px; align-items:center;'; r.innerHTML = `<input type="file" class="perm-image-input" accept="image/*" style="margin-bottom:0; flex-grow:1;"><button type="button" class="edit-btn" style="background-color:#e74c3c; padding: 10px;" onclick="this.parentElement.remove()">❌</button>`; c.appendChild(r); };
+        window.addPdfInput = function() { const c = document.getElementById('pdf-inputs-container'); if (c.children.length >= 4) { alert("PDFは最大4つです"); return; } const r = document.createElement('div'); r.style.cssText = 'display:flex; gap:10px; margin-bottom:10px; align-items:center;'; r.innerHTML = `<input type="file" class="perm-pdf-input" accept="application/pdf" style="margin-bottom:0; flex-grow:1;"><button type="button" class="edit-btn" style="background-color:#e74c3c; padding: 10px;" onclick="this.parentElement.remove()">❌</button>`; c.appendChild(r); };
+        function resetFileInputs() { document.getElementById('image-inputs-container').innerHTML = `<div style="display:flex; gap:10px; margin-bottom:10px; align-items:center;"><input type="file" class="perm-image-input" accept="image/*" style="margin-bottom:0; flex-grow:1;"></div>`; document.getElementById('pdf-inputs-container').innerHTML = `<div style="display:flex; gap:10px; margin-bottom:10px; align-items:center;"><input type="file" class="perm-pdf-input" accept="application/pdf" style="margin-bottom:0; flex-grow:1;"></div>`; document.getElementById('perm-old-images-msg').innerText = "※新しく選ぶと過去の写真は上書きされます。"; document.getElementById('perm-old-pdfs-msg').innerText = "※新しく選ぶと過去のPDFは上書きされます。"; }
+
+        // --- 読み込みと編集 ---
+        function loadPermanentNotices() {
+            db.collection("notices_permanent").orderBy("createdAt", "desc").onSnapshot((qs) => {
+                const tb = document.getElementById('perm-notices-list'); tb.innerHTML = ""; const now = new Date();
+                qs.forEach((doc) => {
+                    const data = doc.data(); const tr = document.createElement('tr');
+                    let tHTML = data.title; if (data.isImportant) tHTML = `<span style="background-color:#e74c3c; color:white; padding:2px 5px; border-radius:3px; font-size:12px; margin-right:5px; white-space:nowrap;">重要</span>` + tHTML;
+                    tHTML = `<span style="color:${data.textColor || '#000000'}; font-weight:bold;">${tHTML}</span>`;
+                    let pText = "永久・即時"; let badge = `<span style="background-color:#27ae60; color:white; padding:3px 8px; border-radius:10px; font-size:12px; white-space:nowrap;">公開中</span>`;
+                    if (data.publishStartDate || data.publishEndDate) {
+                        const s = data.publishStartDate ? data.publishStartDate.replace("T", " ") : "指定なし"; const e = data.publishEndDate ? data.publishEndDate.replace("T", " ") : "指定なし"; pText = `${s} 〜 <br>${e}`;
+                        if (data.publishStartDate && new Date(data.publishStartDate) > now) { badge = `<span style="background-color:#f39c12; color:white; padding:3px 8px; border-radius:10px; font-size:12px; white-space:nowrap;">予約中</span>`; }
+                        if (data.publishEndDate && new Date(data.publishEndDate) < now) { badge = `<span style="background-color:#7f8c8d; color:white; padding:3px 8px; border-radius:10px; font-size:12px; white-space:nowrap;">掲載終了</span>`; }
+                    }
+                    let attHTML = ""; if (data.images && data.images.length > 0) attHTML += `📷 ${data.images.length}枚<br>`; if (data.pdfs && data.pdfs.length > 0) attHTML += `📄 ${data.pdfs.length}個`; if (attHTML === "") attHTML = `<span style="color:gray;">なし</span>`;
+                    const sBody = data.body.replace(/"/g, '&quot;').replace(/'/g, "\\'").replace(/\n/g, "\\n"); const sTitle = data.title.replace(/'/g, "\\'");
+                    const iJSON = data.images ? JSON.stringify(data.images).replace(/"/g, '&quot;') : "[]"; const pJSON = data.pdfs ? JSON.stringify(data.pdfs).replace(/"/g, '&quot;') : "[]";
+                    tr.innerHTML = `<td>${badge}</td><td>${tHTML}</td><td style="font-size:12px; white-space:nowrap;">${attHTML}</td><td style="white-space:nowrap;"><button class="edit-btn" onclick="startEditNotice('${doc.id}', '${sTitle}', '${sBody}', ${data.isImportant}, '${data.textColor || '#000000'}', '${data.publishStartDate || ''}', '${data.publishEndDate || ''}', '${iJSON}', '${pJSON}')">編集</button><button class="edit-btn" style="background-color: #e74c3c; margin-left: 5px;" onclick="deleteNotice('${doc.id}', '${sTitle}')">削除</button></td>`;
+                    tb.appendChild(tr);
+                });
+            });
+        }
+        window.startEditNotice = function(id, title, body, isImp, col, start, end, iJSON, pJSON) {
+            document.getElementById('perm-edit-id').value = id; document.getElementById('perm-title').value = title; document.getElementById('perm-body').value = body.replace(/\\n/g, "\n"); document.getElementById('perm-important').checked = isImp; document.getElementById('perm-color').value = col; document.getElementById('perm-start').value = start; document.getElementById('perm-end').value = end;
+            document.getElementById('perm-old-images').value = iJSON; document.getElementById('perm-old-pdfs').value = pJSON;
+            const imgC = JSON.parse(iJSON).length; const pdfC = JSON.parse(pJSON).length;
+            if(imgC > 0) document.getElementById('perm-old-images-msg').innerHTML = `<span style="color:#e67e22; font-weight:bold;">現在 ${imgC} 枚の写真が登録済。</span> 新しく追加すると過去の写真は上書きされます。`;
+            if(pdfC > 0) document.getElementById('perm-old-pdfs-msg').innerHTML = `<span style="color:#e67e22; font-weight:bold;">現在 ${pdfC} 個のPDFが登録済。</span> 新しく追加すると過去のPDFは上書きされます。`;
+            resetFileInputs(); document.getElementById('perm-form-title').innerText = "✏️ お知らせの編集"; document.getElementById('btn-perm-submit').innerText = "上書き更新する"; document.getElementById('btn-perm-submit').style.backgroundColor = "#f39c12"; document.getElementById('btn-perm-cancel').style.display = "inline-block"; window.scrollTo({ top: 0, behavior: 'smooth' }); 
+        };
+        window.cancelEditNotice = function() {
+            document.getElementById('perm-edit-id').value = ""; document.getElementById('perm-title').value = ""; document.getElementById('perm-body').value = ""; document.getElementById('perm-important').checked = false; document.getElementById('perm-color').value = "#000000"; document.getElementById('perm-start').value = ""; document.getElementById('perm-end').value = "";
+            document.getElementById('perm-old-images').value = ""; document.getElementById('perm-old-pdfs').value = ""; resetFileInputs();
+            document.getElementById('perm-form-title').innerText = "✨ 新規作成"; document.getElementById('btn-perm-submit').innerText = "保存する"; document.getElementById('btn-perm-submit').style.backgroundColor = "#27ae60"; document.getElementById('btn-perm-cancel').style.display = "none";
+        };
+        window.deleteNotice = function(id, title) { if(confirm(`「${title}」を本当に削除しますか？`)) { db.collection("notices_permanent").doc(id).delete().then(() => { addOperationLog(`お知らせ削除: ${title}`); }); } };
+
+        // --- GASアップロード処理 ---
+        function convertFileToBase64(file) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = () => { let enc = reader.result.toString().replace(/^data:(.*,)?/, ''); if ((enc.length % 4) > 0) { enc += '='.repeat(4 - (enc.length % 4)); } resolve(enc); }; reader.onerror = error => reject(error); }); }
+        document.getElementById('btn-perm-submit').addEventListener('click', async function() {
+            const btn = this; const title = document.getElementById('perm-title').value; const body = document.getElementById('perm-body').value; const isImp = document.getElementById('perm-important').checked; const col = document.getElementById('perm-color').value; const start = document.getElementById('perm-start').value; const end = document.getElementById('perm-end').value; const editId = document.getElementById('perm-edit-id').value; 
+            if(!title || !body) { alert("入力漏れがあります！"); return; }
+            if(!GAS_WEB_APP_URL || GAS_WEB_APP_URL.includes("ここに")) { alert("GASのURLを設定してください！"); return; }
+            
+            let iFiles = []; document.querySelectorAll('.perm-image-input').forEach(i => { if(i.files[0]) iFiles.push(i.files[0]); });
+            let pFiles = []; document.querySelectorAll('.perm-pdf-input').forEach(i => { if(i.files[0]) pFiles.push(i.files[0]); });
+            if (iFiles.length > 10 || pFiles.length > 4) { alert("ファイル数が上限を超えています！"); return; }
+
+            btn.innerText = "🚀 転送中..."; btn.disabled = true; btn.style.backgroundColor = "#95a5a6";
+
+            try {
+                let fImgUrls = editId && document.getElementById('perm-old-images').value ? JSON.parse(document.getElementById('perm-old-images').value) : [];
+                let fPdfUrls = editId && document.getElementById('perm-old-pdfs').value ? JSON.parse(document.getElementById('perm-old-pdfs').value) : [];
+
+                if (iFiles.length > 0) {
+                    fImgUrls = []; for (let f of iFiles) {
+                        const res = await fetch(GAS_WEB_APP_URL, { method: 'POST', body: JSON.stringify({ filename: Date.now() + "_" + f.name, mimeType: f.type, base64: await convertFileToBase64(f) }) });
+                        const resJson = await res.json(); if (resJson.success) fImgUrls.push(resJson.url); else throw new Error(resJson.error);
+                    }
+                }
+                if (pFiles.length > 0) {
+                    fPdfUrls = []; for (let f of pFiles) {
+                        const res = await fetch(GAS_WEB_APP_URL, { method: 'POST', body: JSON.stringify({ filename: Date.now() + "_" + f.name, mimeType: f.type, base64: await convertFileToBase64(f) }) });
+                        const resJson = await res.json(); if (resJson.success) fPdfUrls.push(resJson.url); else throw new Error(resJson.error);
+                    }
+                }
+
+                const nData = { title: title, body: body, isImportant: isImp, textColor: col, publishStartDate: start || null, publishEndDate: end || null, images: fImgUrls, pdfs: fPdfUrls };
+                btn.innerText = "💾 保存中...";
+
+                if (editId) { await db.collection("notices_permanent").doc(editId).update(nData); document.getElementById('perm-msg').innerText = "✅ 更新完了！"; addOperationLog(`更新: ${title}`); } 
+                else { nData.createdAt = firebase.firestore.FieldValue.serverTimestamp(); await db.collection("notices_permanent").add(nData); document.getElementById('perm-msg').innerText = "✅ 保存完了！"; addOperationLog(`作成: ${title}`); }
+                cancelEditNotice(); setTimeout(() => document.getElementById('perm-msg').innerText = "", 4000);
+            } catch (e) { alert("エラー: " + e.message); console.error(e); } 
+            finally { btn.disabled = false; btn.innerText = editId ? "上書き更新する" : "保存する"; btn.style.backgroundColor = editId ? "#f39c12" : "#27ae60"; }
+        });
+    </script>
+</body>
+</html>

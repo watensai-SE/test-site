@@ -13,5 +13,47 @@
     <main>
         <p>準備中です。GitHub連携テスト　わーいわーい。</p>
     </main>
+    
+    
+    <div id="public-notice-area"><p>お知らせを読み込み中...</p></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
+<script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyD69OZD1USbhG4ndQZPdv5CpUZwXL5pRmQ",
+        authDomain: "watensai-portal.firebaseapp.com",
+        projectId: "watensai-portal" }; // ※鍵を入れます
+        
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    db.collection("notices_permanent").orderBy("createdAt", "desc").onSnapshot((snapshot) => {
+        const area = document.getElementById('public-notice-area');
+        area.innerHTML = ""; 
+        const now = new Date();
+        
+        snapshot.forEach((doc) => {
+            const data = doc.data();
+            
+            // ★予約投稿・掲載期限の自動判定
+            if (data.publishStartDate && new Date(data.publishStartDate) > now) return; // まだ公開前なら表示しない
+            if (data.publishEndDate && new Date(data.publishEndDate) < now) return; // 期限切れなら表示しない
+            
+            const dateStr = data.createdAt ? data.createdAt.toDate().toLocaleDateString('ja-JP') : "";
+            const badgeHTML = data.isImportant ? `<span style="background-color:#e74c3c; color:white; padding:2px 5px; border-radius:3px; font-size:12px; margin-right:5px;">重要</span>` : '';
+            
+            area.innerHTML += `
+                <div style="border-bottom: 1px solid #ccc; margin-bottom: 15px; padding-bottom: 15px;">
+                    <small style="color: gray;">${dateStr}</small>
+                    <h4 style="margin: 5px 0;">${badgeHTML}<span style="color:${data.textColor || '#000000'};">${data.title}</span></h4>
+                    <p style="margin: 0; white-space: pre-wrap; color:${data.textColor || '#000000'};">${data.body}</p>
+                </div>
+            `;
+        });
+    });
+</script>
+
+
 </body>
 </html>
