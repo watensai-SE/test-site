@@ -46,7 +46,7 @@
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                     <h3 style="margin:0;">📝 システム操作ログ</h3>
                     <div>
-                        <button class="edit-btn" id="bulk-delete-btn" onclick="bulkDeleteLogs()" style="background-color: #e74c3c; display: none; margin-right: 10px; padding: 8px 15px;">🗑️ チェックしたログを一括削除</button>
+                        <button id="bulk-delete-btn" onclick="bulkDeleteLogs()" style="background: transparent; color: #7f8c8d; border: none; display: none; margin-right: 15px; font-size: 20px; cursor: pointer; transition: 0.2s;" title="チェックしたログを一括削除" onmouseover="this.style.color='#c0392b'" onmouseout="this.style.color='#7f8c8d'">🗑️</button>
                         <button class="toggle-btn" id="op-log-toggle-btn" onclick="toggleSecretLogs(this)" style="background-color: #2980b9; display: none;">👁️</button>
                     </div>
                 </div>
@@ -98,7 +98,6 @@
             }
             if (currentUserRole === "superuser") {
                 document.getElementById('op-log-toggle-btn').style.display = "inline-block";
-                // ★チェックボックスと一括削除ボタンを表示
                 document.getElementById('bulk-delete-btn').style.display = "inline-block";
                 document.getElementById('log-checkbox-th').style.display = "table-cell";
                 document.getElementById('log-delete-th').style.display = "table-cell";
@@ -118,7 +117,6 @@
             document.querySelectorAll('.secret-log-row').forEach(r => { r.style.display = window.isSecretLogVisible ? 'table-row' : 'none'; }); 
             b.innerText = window.isSecretLogVisible ? "🙈" : "👁️"; 
             b.style.backgroundColor = window.isSecretLogVisible ? "#e74c3c" : "#2980b9"; 
-            // 隠しログを表示・非表示した際、全選択チェックを一旦外す
             document.getElementById('check-all-logs').checked = false;
             toggleAllLogChecks(document.getElementById('check-all-logs'));
         };
@@ -163,7 +161,6 @@
             }); 
         };
 
-        // --- ★大改修：ログの表示と一括削除システム ---
         function loadOperationLogs() { 
             db.collection("operation_logs").orderBy("timestamp", "desc").onSnapshot((qs) => { 
                 const tb = document.getElementById('operation-list-body'); 
@@ -177,7 +174,6 @@
                     let checkBtn = `<td style="display:none;"></td>`;
                     let delBtn = `<td style="display:none;"></td>`; 
                     if (currentUserRole === "superuser") { 
-                        // 各行にチェックボックスを配置
                         checkBtn = `<td style="text-align: center;"><input type="checkbox" class="log-checkbox" value="${doc.id}" style="transform: scale(1.5); cursor: pointer; margin: 0;"></td>`;
                         delBtn = `<td><button class="edit-btn" style="background:#e74c3c;" onclick="deleteLog('${doc.id}')">削除</button></td>`; 
                     } 
@@ -193,26 +189,21 @@
             }); 
         }
 
-        // 全選択・全解除の制御
         window.toggleAllLogChecks = function(source) {
             const checkboxes = document.querySelectorAll('.log-checkbox');
             checkboxes.forEach(cb => {
-                // 隠れているログを誤って消さないよう、表示されている行のチェックボックスのみ対象にする
                 if (cb.closest('tr').style.display !== 'none') {
                     cb.checked = source.checked;
                 }
             });
         };
 
-        // 単体削除（痕跡を残さないサイレントキル）
         window.deleteLog = function(id) { 
             if(currentUserRole==="superuser" && confirm("削除しますか？")){ 
                 db.collection("operation_logs").doc(id).delete(); 
-                // ★ログ削除のログ生成を削除しました（無限増殖の防止）
             } 
         };
 
-        // 一括削除（プロミスを使った非同期バッチ処理）
         window.bulkDeleteLogs = async function() {
             if (currentUserRole !== "superuser") return;
             const checkboxes = document.querySelectorAll('.log-checkbox:checked');
@@ -223,22 +214,21 @@
             if(confirm(`${checkboxes.length}件のログを一括削除しますか？\n（この操作は取り消せません）`)) {
                 const btn = document.getElementById('bulk-delete-btn');
                 btn.disabled = true;
-                btn.innerText = "⏳ 削除中...";
+                btn.innerText = "⏳";
                 
                 try {
                     const deletePromises = [];
                     checkboxes.forEach(cb => {
                         deletePromises.push(db.collection("operation_logs").doc(cb.value).delete());
                     });
-                    // 全ての削除が完了するまで待機
                     await Promise.all(deletePromises);
-                    document.getElementById('check-all-logs').checked = false; // 全選択のチェックを外す
+                    document.getElementById('check-all-logs').checked = false;
                 } catch (error) {
                     console.error("一括削除エラー:", error);
                     alert("一部のログの削除に失敗しました。");
                 } finally {
                     btn.disabled = false;
-                    btn.innerText = "🗑️ チェックしたログを一括削除";
+                    btn.innerText = "🗑️";
                 }
             }
         };
