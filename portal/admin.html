@@ -40,7 +40,6 @@
                 <div class="form-box" id="pending-users-box" style="display:none; border: 2px solid #3498db;"><h3 style="color: #2980b9;">🔔 承認待ちの新規申請があります！</h3><div class="table-wrapper"><table><thead><tr><th>申請者のメールアドレス</th><th>申請日時</th><th>操作</th></tr></thead><tbody id="pending-list-body"></tbody></table></div></div>
                 <div class="form-box"><h3>登録ユーザー一覧（承認済み）</h3><div class="table-wrapper"><table><thead><tr><th>メールアドレス</th><th>現在の権限</th><th>操作</th></tr></thead><tbody id="user-list-body"></tbody></table></div></div>
                 <div class="form-box" style="border-left: 5px solid #7f8c8d;"><div style="display: flex; justify-content: space-between; align-items: center;"><h3 style="margin: 0; color: #333;">🚫 拒否済みユーザー（ブラックリスト）</h3><button class="toggle-btn" onclick="toggleVisibility('rejected-list-content', this)" style="margin-top:0;">👁️</button></div><div id="rejected-list-content" style="display: none; margin-top: 15px; padding-top: 15px; border-top: 1px dashed #ccc;"><div class="table-wrapper"><table><thead><tr><th>メールアドレス</th><th>操作</th></tr></thead><tbody id="rejected-list-body"></tbody></table></div></div></div>
-                <div class="form-box" id="security-log-section" style="display:none; border-left: 5px solid #e74c3c;"><div style="display: flex; justify-content: space-between; align-items: center;"><h3 style="margin: 0; color: #333;">ログS</h3><button class="toggle-btn" onclick="toggleVisibility('sec-log-content', this)" style="margin-top:0;">👁️</button></div><div id="sec-log-content" style="display: none; margin-top: 15px; padding-top: 15px; border-top: 1px dashed #ccc;"><ul id="security-logs" style="color: #c0392b; font-weight: bold; padding-left: 20px; margin: 0;"></ul></div></div>
             </div>
 
             <div id="tab-logs" class="admin-tab-content" style="display:none;">
@@ -70,35 +69,95 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
-    <script src="js/common.js"></script> <script>
-        // admin.html 専用の処理（common.jsから呼ばれます）
+    <script src="js/common.js"></script> 
+
+    <script>
         function initPage() {
             if (currentUserRole !== "superuser" && currentUserRole !== "admin") {
                 alert("アクセス権限がありません。");
                 window.location.replace('notice-permanent.html');
                 return;
             }
+            // ★スーパーユーザーなら隠しボタン等を表示
+            if (currentUserRole === "superuser") {
+                document.getElementById('op-log-toggle-btn').style.display = "inline-block";
+                document.getElementById('log-delete-th').style.display = "table-cell";
+            }
             loadUsersList();
             loadOperationLogs();
         }
 
-        // 画面内タブ切り替え
         function switchAdminTab(targetId) {
             document.querySelectorAll('.admin-tab-content').forEach(t => t.style.display = 'none');
             document.getElementById(targetId).style.display = 'block';
         }
 
-        window.isSecretLogVisible = false; window.toggleSecretLogs = function(b) { window.isSecretLogVisible = !window.isSecretLogVisible; document.querySelectorAll('.secret-log-row').forEach(r => { r.style.display = window.isSecretLogVisible ? 'table-row' : 'none'; }); b.innerText = window.isSecretLogVisible ? "🙈" : "👁️"; b.style.backgroundColor = window.isSecretLogVisible ? "#e74c3c" : "#2980b9"; };
+        window.isSecretLogVisible = false; 
+        window.toggleSecretLogs = function(b) { 
+            window.isSecretLogVisible = !window.isSecretLogVisible; 
+            document.querySelectorAll('.secret-log-row').forEach(r => { r.style.display = window.isSecretLogVisible ? 'table-row' : 'none'; }); 
+            b.innerText = window.isSecretLogVisible ? "🙈" : "👁️"; 
+            b.style.backgroundColor = window.isSecretLogVisible ? "#e74c3c" : "#2980b9"; 
+        };
+
         function loadUsersList() { db.collection("users").onSnapshot((qs) => { const ta = document.getElementById('user-list-body'), tp = document.getElementById('pending-list-body'), trj = document.getElementById('rejected-list-body'); ta.innerHTML = ""; tp.innerHTML = ""; trj.innerHTML = ""; let pc = 0; qs.forEach((doc) => { const u = doc.data(); const id = doc.id; const tr = document.createElement('tr'); if (u.role === "pending") { pc++; const dt = u.createdAt ? u.createdAt.toDate().toLocaleDateString('ja-JP') : "申請中"; tr.innerHTML = `<td>${u.email}</td><td>${dt}</td><td style="white-space: nowrap;"><button class="approve-btn" onclick="approveUser('${id}', '${u.email}')">承認</button><button class="edit-btn" style="background-color: #e74c3c; margin-left: 5px;" onclick="rejectUser('${id}', '${u.email}')">拒否</button></td>`; tp.appendChild(tr); } else if (u.role === "rejected") { tr.innerHTML = `<td>${u.email}</td><td><button class="edit-btn" style="background-color: #3498db;" onclick="restoreUser('${id}', '${u.email}')">🔄 戻す</button></td>`; trj.appendChild(tr); } else { let rl = u.role; if (rl === "superuser" && currentUserRole !== "superuser") rl = "admin"; let dr = (rl === "superuser" || rl === "admin") ? "管理者" : (rl === "content_admin") ? "コンテンツ管理者" : "一般局員"; if(u.expiresAt) dr += " (期限付き)"; tr.innerHTML = `<td>${u.email}</td><td style="white-space: nowrap;">${dr}</td><td><button class="edit-btn" onclick="openRoleModal('${id}', '${rl}', '${u.email}')">編集</button></td>`; ta.appendChild(tr); } }); const b = document.getElementById('pending-badge'); const pb = document.getElementById('pending-users-box'); if (pc > 0) { b.innerText = pc; b.style.display = 'inline-block'; pb.style.display = 'block'; } else { b.style.display = 'none'; pb.style.display = 'none'; } }); }
         window.approveUser = function(uid, email) { if(confirm(email + " を承認しますか？")) { db.collection("users").doc(uid).update({ role: "general" }).then(() => { addOperationLog(email + " を承認しました"); }); } };
         window.rejectUser = function(uid, email) { if(confirm(email + " を拒否しますか？")) { db.collection("users").doc(uid).update({ role: "rejected" }).then(() => { addOperationLog(email + " を拒否しました"); }); } };
         window.restoreUser = function(uid, email) { if(confirm(email + " を承認待ちに戻しますか？")) { db.collection("users").doc(uid).update({ role: "pending" }).then(() => { addOperationLog(email + " を戻しました"); }); } };
-        window.openRoleModal = function(u, r, e) { if (r === "superuser") { alert("システムエラー：S001"); return; } document.getElementById('modal-user-id').value=u; document.getElementById('modal-user-email-hidden').value=e; document.getElementById('modal-user-email-display').innerText=e+"の権限"; document.getElementById('modal-role-select').value=r; document.getElementById('role-modal').style.display='flex'; }
+        window.openRoleModal = function(u, r, e) { if (r === "superuser") { alert("ERR_0x001"); return; } document.getElementById('modal-user-id').value=u; document.getElementById('modal-user-email-hidden').value=e; document.getElementById('modal-user-email-display').innerText=e+"の権限"; document.getElementById('modal-role-select').value=r; document.getElementById('role-modal').style.display='flex'; }
         window.closeRoleModal = function() { document.getElementById('role-modal').style.display='none'; document.getElementById('modal-is-temp').checked=false; toggleDateInput(); document.getElementById('modal-expire-date').value=''; }
         window.toggleDateInput = function() { document.getElementById('modal-expire-date').style.display = document.getElementById('modal-is-temp').checked ? 'block' : 'none'; }
-        window.saveRole = function() { const tUid = document.getElementById('modal-user-id').value, tEmail = document.getElementById('modal-user-email-hidden').value, nRole = document.getElementById('modal-role-select').value, isTemp = document.getElementById('modal-is-temp').checked, expDate = document.getElementById('modal-expire-date').value; db.collection("users").doc(tUid).get().then((doc) => { if (doc.data().role === "superuser") { if (currentUserRole !== "superuser") { let rJp = (nRole === "admin") ? "管理者" : (nRole === "content_admin") ? "コンテンツ管理者" : "一般局員"; let att = `「${rJp}」`; if (isTemp && expDate) att += `(期限:${expDate})`; addOperationLog(`【🚨警告】${currentUserEmail} が ${tEmail}(S) を ${att} に変更試行！`, true, true); } alert("システムエラー：S002"); closeRoleModal(); return; } let upData = { role: nRole }; let actTxt = `${tEmail} を ${nRole} に変更`; if (isTemp && expDate) { upData.expiresAt = expDate+"T23:59:59"; actTxt+=`(期限:${expDate})`; } else { upData.expiresAt = firebase.firestore.FieldValue.delete(); } db.collection("users").doc(tUid).update(upData).then(() => { addOperationLog(actTxt); alert("更新しました"); closeRoleModal(); }); }); }
-        window.deleteUserFromModal = function() { const tUid = document.getElementById('modal-user-id').value; const tEmail = document.getElementById('modal-user-email-hidden').value; db.collection("users").doc(tUid).get().then((doc) => { if (doc.exists && doc.data().role === "superuser") { if (currentUserRole !== "superuser") addOperationLog(`【🚨警告】${currentUserEmail} が ${tEmail}(S) 削除試行！`, true, true); alert("システムエラー：S002"); closeRoleModal(); return; } if(confirm("本当に削除しますか？")) { db.collection("users").doc(tUid).delete().then(() => { addOperationLog(`${tEmail} を削除`); alert("削除しました。"); closeRoleModal(); }); } }); };
-        function loadOperationLogs() { db.collection("operation_logs").orderBy("timestamp", "desc").onSnapshot((qs) => { const tb = document.getElementById('operation-list-body'), ul = document.getElementById('security-logs'); tb.innerHTML=""; if(ul)ul.innerHTML=""; qs.forEach((doc) => { const d = doc.data(); if (currentUserRole !== "superuser" && (d.isSecurityAlert || d.isHiddenFromAdmin)) return; const date = d.timestamp ? d.timestamp.toDate().toLocaleString('ja-JP') : "記録中..."; if (d.isSecurityAlert && currentUserRole === "superuser") { const li = document.createElement('li'); li.innerHTML = `[${date}] 実行者: ${d.userEmail} <br>内容: ${d.action}`; ul.appendChild(li); } const tr = document.createElement('tr'); let delBtn = `<td style="display:none;"></td>`; if (currentUserRole === "superuser") delBtn = `<td><button class="edit-btn" style="background:#e74c3c;" onclick="deleteLog('${doc.id}')">削除</button></td>`; tr.innerHTML = `<td>${date}</td><td>${d.userEmail}</td><td style="${d.isSecurityAlert?'color:red;font-weight:bold;':''}">${d.action}</td>${delBtn}`; if (currentUserRole === "superuser" && (d.isSecurityAlert || d.isHiddenFromAdmin)) { tr.classList.add('secret-log-row'); tr.style.display = window.isSecretLogVisible ? 'table-row' : 'none'; } tb.appendChild(tr); }); }); }
+
+        // ★コードの秘匿化：日本語を削除し、システムエラーコードに見せかける
+        window.saveRole = function() { const tUid = document.getElementById('modal-user-id').value, tEmail = document.getElementById('modal-user-email-hidden').value, nRole = document.getElementById('modal-role-select').value, isTemp = document.getElementById('modal-is-temp').checked, expDate = document.getElementById('modal-expire-date').value; 
+            db.collection("users").doc(tUid).get().then((doc) => { 
+                if (doc.data().role === "superuser") { 
+                    if (currentUserRole !== "superuser") { 
+                        addOperationLog(`SYS_ERR_AUTH_MOD: [${currentUserEmail}] -> [${tEmail}]`, true, true); 
+                    } 
+                    alert("ERR_0x001"); 
+                    closeRoleModal(); 
+                    return; 
+                } 
+                let upData = { role: nRole }; let actTxt = `${tEmail} を ${nRole} に変更`; if (isTemp && expDate) { upData.expiresAt = expDate+"T23:59:59"; actTxt+=`(期限:${expDate})`; } else { upData.expiresAt = firebase.firestore.FieldValue.delete(); } 
+                db.collection("users").doc(tUid).update(upData).then(() => { addOperationLog(actTxt); alert("更新しました"); closeRoleModal(); }); 
+            }); 
+        }
+        window.deleteUserFromModal = function() { const tUid = document.getElementById('modal-user-id').value; const tEmail = document.getElementById('modal-user-email-hidden').value; 
+            db.collection("users").doc(tUid).get().then((doc) => { 
+                if (doc.exists && doc.data().role === "superuser") { 
+                    if (currentUserRole !== "superuser") {
+                        addOperationLog(`SYS_ERR_AUTH_DEL: [${currentUserEmail}] -> [${tEmail}]`, true, true); 
+                    }
+                    alert("ERR_0x001"); 
+                    closeRoleModal(); 
+                    return; 
+                } 
+                if(confirm("本当に削除しますか？")) { db.collection("users").doc(tUid).delete().then(() => { addOperationLog(`${tEmail} を削除`); alert("削除しました。"); closeRoleModal(); }); } 
+            }); 
+        };
+
+        // 操作ログの一覧。セキュリティログは通常のテーブルの中に隠れる（非表示行になる）
+        function loadOperationLogs() { 
+            db.collection("operation_logs").orderBy("timestamp", "desc").onSnapshot((qs) => { 
+                const tb = document.getElementById('operation-list-body'); 
+                tb.innerHTML=""; 
+                qs.forEach((doc) => { 
+                    const d = doc.data(); 
+                    if (currentUserRole !== "superuser" && (d.isSecurityAlert || d.isHiddenFromAdmin)) return; 
+                    const date = d.timestamp ? d.timestamp.toDate().toLocaleString('ja-JP') : "記録中..."; 
+                    const tr = document.createElement('tr'); 
+                    let delBtn = `<td style="display:none;"></td>`; 
+                    if (currentUserRole === "superuser") delBtn = `<td><button class="edit-btn" style="background:#e74c3c;" onclick="deleteLog('${doc.id}')">削除</button></td>`; 
+                    tr.innerHTML = `<td>${date}</td><td>${d.userEmail}</td><td style="${d.isSecurityAlert?'color:red;font-weight:bold;':''}">${d.action}</td>${delBtn}`; 
+                    if (currentUserRole === "superuser" && (d.isSecurityAlert || d.isHiddenFromAdmin)) { 
+                        tr.classList.add('secret-log-row'); 
+                        tr.style.display = window.isSecretLogVisible ? 'table-row' : 'none'; 
+                    } 
+                    tb.appendChild(tr); 
+                }); 
+            }); 
+        }
         window.deleteLog = function(id) { if(currentUserRole==="superuser" && confirm("削除しますか？")){ db.collection("operation_logs").doc(id).delete(); addOperationLog("ログ削除", false, true); } };
     </script>
 </body>
